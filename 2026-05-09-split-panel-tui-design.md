@@ -1,7 +1,7 @@
 # Split Panel TUI Design
 
 **Date:** 2026-05-09
-**Status:** Approved
+**Status:** Implemented
 
 ## Overview
 

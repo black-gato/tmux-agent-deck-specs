@@ -1,7 +1,7 @@
 # M1 Interaction Primitives Design
 
 **Date:** 2026-05-10
-**Status:** Approved
+**Status:** Implemented
 
 ## Overview
 
