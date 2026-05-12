@@ -29,7 +29,7 @@ Redesign the TUI from a single-column session list to a persistent split layout:
                  │   Implement sub-agent approach for spec
                  │   review. Check divergences doc first.
                  │   e edit
- Enter Attach  v Expand output  e Notes  x Send  n New  q Quit
+ Enter Attach  v Output  e Notes  x Send  n New  q Quit
 ```
 
 ### Column widths

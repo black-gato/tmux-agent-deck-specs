@@ -2,6 +2,32 @@
 
 Use this checklist for real end-to-end behavior that unit/component tests do not cover well: actual tmux panes, SQLite state, terminal rendering, and interactive keyboard flows.
 
+## Current Coverage
+
+Automated E2E coverage now exists under `test/e2e` and runs with:
+
+```bash
+go test -timeout=140s -tags=e2e ./test/e2e
+```
+
+Covered by the E2E suite:
+
+- send to pane, including `Ctrl+C` interception and stopped-session no-op
+- pane targeting, including active-pane reset after navigation/reload
+- fork session creation and DB field cloning
+- broadcast to direct groups, sub-groups, and session-row group roots
+- bash status transitions: `waiting` -> `running` -> `idle` -> `error`
+- stopped-session attach and already-running attach without duplicate session creation
+- narrow/wide rendering, dialog escape, and resize recovery
+
+Still worth manual verification:
+
+- attach detach and return behavior in a real interactive terminal after leaving tmux
+- forked session start/attach independence from the source session
+- tool-specific waiting heuristics for real `claude`, `aider`, and `copilot` sessions
+- broadcast scope indicator text while toggling between direct and sub-group modes
+- long dialog editing paths: long input, repeated backspace, submit
+
 ## Setup
 
 - [x] Build the local binary:

@@ -1,5 +1,29 @@
 # Split Panel TUI — Manual QA Checklist
 
+## Current Coverage
+
+Automated coverage today is split across unit tests in `internal/ui` and the build-tagged E2E suite in `test/e2e`.
+
+Covered automatically:
+
+- split renders at narrow and wide widths
+- terminal resize redraws both panels
+- long session titles truncate at the divider
+- session detail panel shows title, status, group, panes, notes, and captured output
+- group selection leaves the detail panel empty without crashing
+- missing tmux session output/pane data is handled safely
+- notes edit open/save/discard behavior and group-row no-op
+- output tail stays within the available panel height
+- dialog escape and post-resize rendering recovery in the real TUI
+
+Manual-only checks still needed:
+
+- `v` full-screen toggle behavior in a real terminal session
+- live output tail behavior under rapid streaming output
+- header status counts changing under real multi-session churn
+- icon clarity and wording for `running`, `waiting`, `idle`, and `error`
+- note editing ergonomics in a real interactive terminal, beyond unit coverage
+
 ## Layout
 
 - [x] Split renders correctly at various terminal widths (narrow ~80, wide ~200)
@@ -22,8 +46,8 @@
 
 ## Full-Screen Toggle (`v`)
 
-- [x] `v` expands detail panel to full width; list disappears
-- [x] `v` again returns to split layout
+- [ ] `v` expands detail panel to full width; list disappears
+- [ ] `v` again returns to split layout
 
 **Feedback:**
 
@@ -36,7 +60,7 @@
 - [x] `Esc` → discards changes, notes unchanged
 - [x] `e` on a group → no effect (no crash)
 
-**Feedback:** when in split layout you can't actually create a note. The tui seems to be frozen but when I hit escape I can interact with the tui again
+**Feedback:** Unit coverage passes for save/discard, but this should still be spot-checked in a real terminal session.
 
 ---
 
@@ -54,24 +78,16 @@
 - [ ] Status counts (running / waiting / idle) update as session states change
 
 **Feedback:**
-Icons need to be fixed I can't tell the difference between running and waiting interms of usage.
-I want running to mean that something is processing in that session (either claude is running or something is process like test). Running currently seems to mean that the session is not empty. 
-
-waiting should be waiting for input from the user.
-
-idel should be nothing is either waiting for a response or actively processing data
-
-dead should be session that aren't responding
+Icons still need a product pass. `running` should mean active processing, `waiting` should mean blocked on user input, `idle` should mean stable but not waiting or processing, and `error` should cover dead or missing sessions.
 
 ---
 
 ## Footer
 
-- [x] `v Expand output` key hint is visible and accurate
+- [x] `v Output` key hint is visible and accurate
 
 **Feedback:** 
 
 ---
 
 ## General Notes
-
