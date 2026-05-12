@@ -19,7 +19,7 @@ No schema changes. Send and broadcast are fire-and-forget tmux calls. Fork reuse
 | Fork session | `f` | Clone selected session's `ProjectPath`, `Tool`, `GroupPath`; prompt for new title; created as `stopped` |
 | Broadcast to group | `b` | Send same keys to every running session in a group; Tab toggles scope (direct / include sub-groups) |
 | Pane targeting | `tab` | Cycle active pane in detail panel; `x` sends to that pane specifically; resets to 0 on navigation |
-| Status heuristics | — | Extend `DetectStatus` with per-tool waiting patterns (aider, copilot, raw bash) |
+| Status heuristics | — | Extend `DetectStatus` with prompt-aware waiting patterns for Claude-style prompts plus shell prompts |
 
 ---
 
@@ -34,7 +34,7 @@ No schema changes. Send and broadcast are fire-and-forget tmux calls. Fork reuse
 | `internal/ui/dialog.go` | Add `scope bool`, `scopeLabels [2]string` to `dialogState`; add `interceptCtrl` helper; extend `updateDialog` and `commitDialog` for new modes; extend `renderDialog` for broadcast scope display |
 | `internal/ui/keys.go` | Add `'x': "send-pane"`, `'f': "fork-session"`, `'b': "broadcast"`, `tea.KeyTab: "cycle-pane"` |
 | `internal/ui/app.go` | Add `activePaneIdx int` to `Model`; wire `send-pane`, `fork-session`, `broadcast`, `cycle-pane` in `updateNavigation`; reset `activePaneIdx` in `Reload`; highlight active pane in `renderPaneList`; update `renderFooter` to include `x Send  f Fork  b Broadcast` |
-| `internal/tmux/status.go` | Add `tool string` param to `DetectStatus`; add per-tool waiting patterns |
+| `internal/tmux/status.go` | Add `tool string` param to `DetectStatus`; add prompt-aware waiting patterns and shell fallback |
 | `internal/state/poller.go` | Pass `session.Tool` to `DetectStatus` |
 
 ---
@@ -154,16 +154,15 @@ New accessor: `func (m *Model) ActivePaneIdx() int { return m.activePaneIdx }`.
 func DetectStatus(output string, lastChange time.Time, tool string) Status
 ```
 
-### Per-tool waiting patterns
+### Waiting patterns
 
 Checked before the existing fallback:
 
 | Tool | Waiting pattern |
 |---|---|
-| `"claude"` | ends with `> ` or `>` |
-| `"aider"` | ends with `aider> ` |
-| `"copilot"` | ends with `❯ ` or `> ` |
-| `""` / other | ends with `$ `, `# `, or `> ` |
+| `"claude"` / `"claude-danger"` | last line is standalone `>` |
+| `"shell"` / `""` / other | last line ends with `$` or `#` |
+| `"codex"` / `"codex-yolo"` | currently rely on the generic shell-style fallback when applicable |
 
 Running patterns (spinners, `"Thinking"`, `"Running"`) remain tool-agnostic.
 

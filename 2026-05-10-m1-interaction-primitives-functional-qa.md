@@ -14,9 +14,9 @@ Covered by the E2E suite:
 
 - send to pane, including `Ctrl+C` interception and stopped-session no-op
 - pane targeting, including active-pane reset after navigation/reload
-- fork session creation and DB field cloning
+- fork session creation, including the extra startup-script confirmation step, and DB field cloning
 - broadcast to direct groups, sub-groups, and session-row group roots
-- bash status transitions: `waiting` -> `running` -> `idle` -> `error`
+- shell prompt status transitions: `waiting` -> `running` -> `idle` -> `error`
 - stopped-session attach and already-running attach without duplicate session creation
 - narrow/wide rendering, dialog escape, and resize recovery
 
@@ -24,7 +24,7 @@ Still worth manual verification:
 
 - attach detach and return behavior in a real interactive terminal after leaving tmux
 - forked session start/attach independence from the source session
-- tool-specific waiting heuristics for real `claude`, `aider`, and `copilot` sessions
+- real launch-profile startup behavior for `claude`, `claude-danger`, `codex`, `codex-yolo`, and `shell`
 - broadcast scope indicator text while toggling between direct and sub-group modes
 - long dialog editing paths: long input, repeated backspace, submit
 
@@ -45,13 +45,13 @@ export AGENT_DECK_DB="$(mktemp -t agent-deck-qa.XXXXXX.db)"
 - [x] Create nested groups and sessions:
 
 ```bash
-./tmux-agent-deck group create qa --tool bash
-./tmux-agent-deck group create qa/frontend --tool bash
-./tmux-agent-deck group create qa/backend --tool bash
-./tmux-agent-deck add --title qa-root --group qa --tool bash --project "$PWD"
-./tmux-agent-deck add --title qa-front --group qa/frontend --tool bash --project "$PWD"
-./tmux-agent-deck add --title qa-back --group qa/backend --tool bash --project "$PWD"
-./tmux-agent-deck add --title qa-stopped --group qa --tool bash --project "$PWD"
+./tmux-agent-deck group create qa --tool shell
+./tmux-agent-deck group create qa/frontend --tool shell
+./tmux-agent-deck group create qa/backend --tool shell
+./tmux-agent-deck add --title qa-root --group qa --tool shell --project "$PWD"
+./tmux-agent-deck add --title qa-front --group qa/frontend --tool shell --project "$PWD"
+./tmux-agent-deck add --title qa-back --group qa/backend --tool shell --project "$PWD"
+./tmux-agent-deck add --title qa-stopped --group qa --tool shell --project "$PWD"
 ./tmux-agent-deck session start qa-root
 ./tmux-agent-deck session start qa-front
 ./tmux-agent-deck session start qa-back
@@ -120,6 +120,7 @@ tmux split-window -t <qa-root-tmux>
 ## Fork Session (`f`)
 
 - [ ] Select `qa-front`, press `f`, type `qa-front-fork`, then press `Enter`.
+- [ ] Press `Enter` again to accept the default empty startup script for the fork.
 - [ ] Verify a new session row appears named `qa-front-fork`.
 - [ ] Verify it appears in the same group as `qa-front`.
 - [ ] Run:
@@ -128,7 +129,7 @@ tmux split-window -t <qa-root-tmux>
 ./tmux-agent-deck list --json
 ```
 
-- [ ] Verify `qa-front-fork` has the same group, project path, and tool as `qa-front`.
+- [ ] Verify `qa-front-fork` has the same group, project path, tool, and startup script as `qa-front`.
 - [ ] Verify `qa-front-fork` is stopped and does not automatically create a tmux session.
 - [ ] Start and attach the fork:
 
@@ -171,6 +172,7 @@ tmux send-keys -t <qa-root-tmux> C-c 'sleep 60' Enter
 tmux send-keys -t <qa-front-tmux> 'sleep 60' Enter
 tmux send-keys -t <qa-back-tmux> 'sleep 60' Enter
 ```
+
 - [ ] In the TUI, select the `qa` group.
 - [ ] Press `b`.
 - [ ] Press `Tab`.
@@ -187,7 +189,7 @@ tmux send-keys -t <qa-back-tmux> 'sleep 60' Enter
 
 ## Status Heuristics
 
-- [ ] Start one `bash` session and leave it at a shell prompt.
+- [ ] Start one `shell` session and leave it at a `zsh` prompt.
 - [ ] Verify it becomes `waiting`.
 - [ ] Run `sleep 60` inside that pane.
 - [ ] Verify it becomes `running`.
@@ -200,7 +202,7 @@ tmux kill-session -t <tmux-session-name>
 ```
 
 - [ ] Verify the TUI handles the missing/dead tmux session without crashing.
-- [ ] If available locally, repeat with `claude`, `aider`, and `copilot` sessions and verify their prompt states are classified as waiting.
+- [ ] If available locally, repeat with `claude`, `claude-danger`, `codex`, and `codex-yolo` sessions and verify their prompt states are classified as waiting when they return to their ready prompt.
 
 **Feedback:**
 

@@ -5,7 +5,7 @@
 
 ## Overview
 
-A terminal UI for managing multiple AI coding agent sessions in tmux from a single interface. Sessions are organized into nested groups. The tool is a focused MVP — no remote management, watchers, MCP management, or conductor.
+A terminal UI for managing multiple AI coding agent sessions in tmux from a single interface. Sessions are organized into nested groups. The shipped MVP stays focused: no remote management, watchers, or MCP management. Conductor workflows are deferred to a later milestone rather than part of the initial product surface.
 
 ---
 
@@ -67,21 +67,22 @@ CREATE TABLE groups (
 );
 
 CREATE TABLE sessions (
-    id           TEXT PRIMARY KEY,  -- uuid
-    title        TEXT NOT NULL,
-    group_path   TEXT NOT NULL DEFAULT 'my-sessions',
-    tmux_session TEXT NOT NULL DEFAULT '',
-    project_path TEXT NOT NULL,
-    tool         TEXT NOT NULL DEFAULT 'claude',
-    status       TEXT NOT NULL DEFAULT 'stopped',
-    created_at   INTEGER NOT NULL,
-    last_active  INTEGER NOT NULL DEFAULT 0
+    id             TEXT PRIMARY KEY,  -- uuid
+    title          TEXT NOT NULL,
+    group_path     TEXT NOT NULL DEFAULT 'my-sessions',
+    tmux_session   TEXT NOT NULL DEFAULT '',
+    project_path   TEXT NOT NULL,
+    tool           TEXT NOT NULL DEFAULT 'claude',
+    startup_script TEXT NOT NULL DEFAULT '',
+    status         TEXT NOT NULL DEFAULT 'stopped',
+    created_at     INTEGER NOT NULL,
+    last_active    INTEGER NOT NULL DEFAULT 0
 );
 ```
 
 **Group nesting** is stored as path strings (`work/frontend`). Parent-child relationships are derived by path prefix — no foreign keys needed. Querying children of `work` is `WHERE path LIKE 'work/%'`.
 
-Sessions inherit `default_tool` and `default_path` from their group at creation time but store their own copy — changing a group default does not affect existing sessions.
+Sessions inherit `default_tool` and `default_path` from their group at creation time but store their own copy — changing a group default does not affect existing sessions. Session `tool` values are launch profile IDs such as `claude`, `claude-danger`, `codex`, `codex-yolo`, and `shell`. The `shell` profile launches interactive login `zsh` (`zsh -il`).
 
 ---
 
@@ -122,6 +123,11 @@ Sessions inherit `default_tool` and `default_path` from their group at creation 
 |-----|--------|
 | `Enter` | Attach to session |
 | `n` | New session in current group |
+| `e` | Edit notes or group defaults |
+| `x` | Send keys to active pane |
+| `f` | Fork session |
+| `b` | Broadcast to group |
+| `/` | Search output |
 | `g` | New group |
 | `m` | Move session to group |
 | `r` | Rename session or group |
@@ -133,11 +139,23 @@ Sessions inherit `default_tool` and `default_path` from their group at creation 
 
 Polled from `tmux capture-pane -t <session> -p` every ~1s:
 
-- **waiting** — Claude's `>` prompt visible at bottom of pane
+- **waiting** — prompt visible at bottom of pane
 - **running** — spinner or thinking text present
 - **idle** — no state change for 30s after last `running`
 - **error** — pane exited or tmux session no longer exists
 - **stopped** — session was explicitly stopped via CLI or TUI
+
+### Session Configuration
+
+The `n` flow is multi-step:
+
+1. Preset picker if `~/.config/tmux-agent-deck/presets.toml` exists
+2. Session title
+3. Project path
+4. Tool selection from launch profiles
+5. Optional startup script
+
+Project paths support `~` and `$VAR` expansion. `Tab` completes directories during the project-path prompt. Tool and preset selection use arrow keys.
 
 ---
 
@@ -145,13 +163,14 @@ Polled from `tmux capture-pane -t <session> -p` every ~1s:
 
 ```
 tmux-agent-deck                          # launch TUI
-tmux-agent-deck add --title "Title" [--group "work/frontend"] [--project /path] [--tool claude]
+tmux-agent-deck add --title "Title" [--group "work/frontend"] [--project /path] [--tool claude] [--startup-script 'claude --resume']
 tmux-agent-deck list [--json]
 tmux-agent-deck remove <id|title>
 tmux-agent-deck session start <id|title>
 tmux-agent-deck session stop <id|title>
 tmux-agent-deck session attach <id|title>
-tmux-agent-deck group create <path> [--tool claude]
+tmux-agent-deck group create <path> [--path /project] [--tool claude]
+tmux-agent-deck group defaults <path> [--path /project] [--tool codex-yolo]
 tmux-agent-deck group delete <name>
 tmux-agent-deck group move <session> <group>
 ```

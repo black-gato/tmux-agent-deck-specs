@@ -17,7 +17,7 @@ Redesign the TUI from a single-column session list to a persistent split layout:
  SESSIONS        │  SESSION ──────────────────────────────
  ──────────────  │   update-design-spec-divergences  ○ waiting
  ▼ My Sessions   │   group: My Sessions
-   ○ mama        │   [0] claude  [1] bash  [2] nvim
+   ○ mama        │   [0] claude  [1] zsh  [2] nvim
    ● api-work    │
    ○ update-desi │  OUTPUT ───────────────────────────────
    ◐ notes       │   Analyzing changes to client.go...
