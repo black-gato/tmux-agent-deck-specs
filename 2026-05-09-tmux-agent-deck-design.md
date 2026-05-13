@@ -67,16 +67,16 @@ CREATE TABLE groups (
 );
 
 CREATE TABLE sessions (
-    id             TEXT PRIMARY KEY,  -- uuid
-    title          TEXT NOT NULL,
-    group_path     TEXT NOT NULL DEFAULT 'my-sessions',
-    tmux_session   TEXT NOT NULL DEFAULT '',
-    project_path   TEXT NOT NULL,
-    tool           TEXT NOT NULL DEFAULT 'claude',
+    id           TEXT PRIMARY KEY,  -- uuid
+    title        TEXT NOT NULL,
+    group_path   TEXT NOT NULL DEFAULT 'my-sessions',
+    tmux_session TEXT NOT NULL DEFAULT '',
+    project_path TEXT NOT NULL,
+    tool         TEXT NOT NULL DEFAULT 'claude',
     startup_script TEXT NOT NULL DEFAULT '',
-    status         TEXT NOT NULL DEFAULT 'stopped',
-    created_at     INTEGER NOT NULL,
-    last_active    INTEGER NOT NULL DEFAULT 0
+    status       TEXT NOT NULL DEFAULT 'stopped',
+    created_at   INTEGER NOT NULL,
+    last_active  INTEGER NOT NULL DEFAULT 0
 );
 ```
 
@@ -139,7 +139,7 @@ Sessions inherit `default_tool` and `default_path` from their group at creation 
 
 Polled from `tmux capture-pane -t <session> -p` every ~1s:
 
-- **waiting** — prompt visible at bottom of pane
+- **waiting** — Claude's `>` prompt visible at bottom of pane
 - **running** — spinner or thinking text present
 - **idle** — no state change for 30s after last `running`
 - **error** — pane exited or tmux session no longer exists
