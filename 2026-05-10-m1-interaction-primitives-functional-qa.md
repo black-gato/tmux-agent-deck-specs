@@ -234,6 +234,47 @@ tmux kill-session -t <tmux-session-name>
 
 ---
 
+## Bug Regression Checks
+
+These cases cover bugs that were fixed and must not regress.
+
+### ctrl+c behavior (BUG-001)
+
+- [ ] In navigation mode (no dialog open), press `ctrl+c`.
+- [ ] Verify the TUI quits cleanly without leaving the terminal in a broken state.
+- [ ] Open a `new-session` dialog (`n`), then press `ctrl+c`.
+- [ ] Verify the dialog closes without creating a session and normal navigation resumes.
+- [ ] Open a `send-pane` dialog (`x`), then press `ctrl+c`.
+- [ ] Verify the dialog stays open and `ctrl+c` is queued to be sent as a key to the pane (not as a quit).
+- [ ] Force an error (e.g. corrupt DB path) so the error view renders.
+- [ ] Verify the view shows "Press q or ctrl+c to quit" and that both `q` and `ctrl+c` exit the TUI.
+
+**Feedback:**
+
+---
+
+### Duplicate group error (BUG-002)
+
+- [ ] Create a group: `./tmux-agent-deck group create qa-dup`.
+- [ ] Run the same command again: `./tmux-agent-deck group create qa-dup`.
+- [ ] Verify the output says `group "qa-dup" already exists` (not a raw SQLite UNIQUE constraint error).
+- [ ] In the TUI, press `g`, type the same path, press `Enter`.
+- [ ] Verify the error view shows a friendly "already exists" message, not raw SQL.
+
+**Feedback:**
+
+---
+
+### Escalate no-op on non-waiting session (BUG-004)
+
+- [ ] Select a session that is in `running` or `idle` state.
+- [ ] Press `C` (escalate to conductor).
+- [ ] Verify nothing happens: no error message, no dialog, no mode change.
+
+**Feedback:**
+
+---
+
 ## Cleanup
 
 - [ ] Stop test sessions:

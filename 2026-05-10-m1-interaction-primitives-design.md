@@ -41,13 +41,16 @@ No schema changes. Send and broadcast are fire-and-forget tmux calls. Fork reuse
 
 ## tmux Client
 
-### New interface method
+### Interface methods
 
 ```go
 SendKeys(session string, paneIndex int, keys string) error
+SendRawKeys(session string, paneIndex int, keys string) error
 ```
 
-Wraps `tmux send-keys -t session:paneIndex keys`. No-op if `keys` is empty. Returns error only on tmux failure.
+**`SendKeys`** — sends literal text via `tmux send-keys -l -t session:paneIndex keys`. The `-l` flag ensures the argument is interpreted as literal characters, not tmux key names. No-op if `keys` is empty.
+
+**`SendRawKeys`** — sends a tmux key name (no `-l` flag) via `tmux send-keys -t session:paneIndex keys`. Used exclusively for control sequences like `C-c`, `C-d`, `Enter`. No-op if `keys` is empty.
 
 ### `FakeTmuxClient` additions
 
@@ -58,10 +61,11 @@ type SentKeysCall struct {
     Keys       string
 }
 
-SentKeys []SentKeysCall
+SentKeys    []SentKeysCall   // literal text calls via SendKeys
+SentRawKeys []SentKeysCall   // key name calls via SendRawKeys
 ```
 
-`SendKeys` stub appends to `SentKeys` and returns nil.
+`SendKeys` appends to `SentKeys`; `SendRawKeys` appends to `SentRawKeys`. Both return nil.
 
 ---
 
@@ -73,10 +77,13 @@ SentKeys []SentKeysCall
 type dialogState struct {
     prompt      string
     value       string
+    ctrlKeys    []string    // send-pane/broadcast only: intercepted ctrl key names (e.g. "C-c")
     scope       bool        // broadcast only: false = direct group, true = include sub-groups
     scopeLabels [2]string   // broadcast only: e.g. {"this group", "all sub-groups"}
 }
 ```
+
+`ctrlKeys` holds tmux key names captured by `interceptCtrl`. They are dispatched via `SendRawKeys` separately from the literal text in `value`.
 
 ### `interceptCtrl` helper
 
@@ -101,9 +108,10 @@ Returns `("", false)` for unmapped keys. `Enter` and `Esc` are not intercepted �
 ### `updateDialog` extensions
 
 For modes `"send-pane"` and `"broadcast"`:
-- Ctrl keys → `interceptCtrl` → if matched, append tmux key name to `dialog.value`
+- Ctrl keys → `interceptCtrl` → if matched, append tmux key name to `dialog.ctrlKeys` (not `dialog.value`)
 - Tab in `"broadcast"` mode → toggle `dialog.scope`
-- Enter, Esc, Backspace → existing behavior unchanged
+- Enter → submit; Esc and `ctrl+c` → cancel (clear `m.mode`); Backspace → existing behavior
+- `ctrl+c` in `"send-pane"`/`"broadcast"` is intercepted before the Esc/cancel check, so it appends to `ctrlKeys` rather than cancelling the dialog
 
 ### `renderDialog` broadcast display
 
@@ -116,11 +124,11 @@ Active scope shown with `→`. Non-active scope is dim.
 
 ### `commitDialog` new cases
 
-**`"send-pane"`:** Calls `m.tmuxC.SendKeys(s.TmuxSession, m.activePaneIdx, m.dialog.value)`. No-op if `s.TmuxSession == ""` or `m.dialog.value == ""`.
+**`"send-pane"`:** Dispatches via `sendToPane(session, paneIndex)`. No-op if both `dialog.value` and `dialog.ctrlKeys` are empty. `sendToPane` calls `SendKeys` with the literal text (if non-empty) then `SendRawKeys` for each ctrl key in order.
 
 **`"fork-session"`:** Creates a new `db.Session` copying `ProjectPath`, `Tool`, `GroupPath` from the current session. Title is `m.dialog.value` (trimmed). Status is `"stopped"`. `CreatedAt` is `time.Now().Unix()`. `ID` is `uuid.New().String()`.
 
-**`"broadcast"`:** Resolves the target group: if cursor is on a group, use `group.Path`; if cursor is on a session, use `session.GroupPath`. Opens with `dialogState{scopeLabels: [2]string{"this group", "all sub-groups"}}`. Collects sessions from `m.sessions` matching the group scope, filters to `status == "running"`, calls `SendKeys` for each. Scope logic:
+**`"broadcast"`:** Resolves the target group: if cursor is on a group, use `group.Path`; if cursor is on a session, use `session.GroupPath`. Opens with `dialogState{scopeLabels: [2]string{"this group", "all sub-groups"}}`. Collects sessions from `m.sessions` matching the group scope, filters to `status == "running"`, calls `sendToPane` for each. No-op if both `dialog.value` and `dialog.ctrlKeys` are empty. Scope logic:
 - `scope=false`: sessions where `GroupPath == group.Path`
 - `scope=true`: sessions where `GroupPath == group.Path` or `strings.HasPrefix(GroupPath, group.Path+"/")`
 

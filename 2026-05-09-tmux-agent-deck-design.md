@@ -134,6 +134,7 @@ Sessions inherit `default_tool` and `default_path` from their group at creation 
 | `d` | Delete session or group |
 | `Space` | Collapse/expand group |
 | `q` | Quit |
+| `ctrl+c` | Quit (navigation mode); cancel dialog (non-send dialog modes) |
 
 ### State Detection
 
@@ -169,7 +170,7 @@ tmux-agent-deck remove <id|title>
 tmux-agent-deck session start <id|title>
 tmux-agent-deck session stop <id|title>
 tmux-agent-deck session attach <id|title>
-tmux-agent-deck group create <path> [--path /project] [--tool claude]
+tmux-agent-deck group create <path> [--path /project] [--tool claude]   # errors with "group X already exists" if path is taken
 tmux-agent-deck group defaults <path> [--path /project] [--tool codex-yolo]
 tmux-agent-deck group delete <name>
 tmux-agent-deck group move <session> <group>
