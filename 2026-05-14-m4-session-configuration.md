@@ -1,5 +1,7 @@
 # M4 Session Configuration Implementation Plan
 
+**Status: Complete** — all tasks implemented and verified. See `docs/superpowers/specs/2026-05-10-roadmap.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Extend the new-session dialog into a 4-step flow collecting title, project path, tool, and startup script; wire group defaults as pre-fills for path and tool; and deliver the startup script to the tmux pane 2 seconds after a new session is created.
@@ -18,7 +20,7 @@
 - Modify: `internal/db/db_test.go` (update schema version assertion)
 - Modify: `internal/db/sessions_test.go` (add startup_script test)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `internal/db/db_test.go`, change the existing `TestOpenCreatesSchemaVersion` to expect `"5"` instead of `"4"`:
 
@@ -64,7 +66,7 @@ func TestSessionStartupScriptPersistedAndRetrieved(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test ./internal/db/... -run "TestOpenCreatesSchemaVersion|TestSessionStartupScriptPersistedAndRetrieved" -v
@@ -72,7 +74,7 @@ go test ./internal/db/... -run "TestOpenCreatesSchemaVersion|TestSessionStartupS
 
 Expected: `TestOpenCreatesSchemaVersion` FAIL with `got "4" want "5"`, `TestSessionStartupScriptPersistedAndRetrieved` FAIL with column does not exist or scan error.
 
-- [ ] **Step 3: Add v5 migration to db.go**
+- [x] **Step 3: Add v5 migration to db.go**
 
 Replace the full `migrate` function in `internal/db/db.go`:
 
@@ -169,7 +171,7 @@ func migrate(conn *sql.DB) error {
 }
 ```
 
-- [ ] **Step 4: Update Session struct and all SQL in sessions.go**
+- [x] **Step 4: Update Session struct and all SQL in sessions.go**
 
 Add `StartupScript string` to the `Session` struct (after `Tags`):
 
@@ -336,7 +338,7 @@ func scanSessions(rows *sql.Rows) ([]Session, error) {
 }
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 ```bash
 go test ./internal/db/... -v
@@ -344,7 +346,7 @@ go test ./internal/db/... -v
 
 Expected: all pass. Look specifically for `TestOpenCreatesSchemaVersion` (now expects "5") and `TestSessionStartupScriptPersistedAndRetrieved`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add internal/db/db.go internal/db/sessions.go internal/db/db_test.go internal/db/sessions_test.go
@@ -368,7 +370,7 @@ git commit -m "feat(db): add startup_script column (schema v5)"
 - Esc always cancels entirely (no step-back)
 - `savedPath` is pre-filled from group default or `os.Getwd()` when the dialog opens; it becomes the initial value shown to the user at step 1
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `internal/ui/app_test.go`, add this test:
 
@@ -481,7 +483,7 @@ func TestNewSessionInheritsGroupDefaults(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test ./internal/ui/... -run "TestNewSessionFlowCreatesSessionWithTool|TestNewSessionInheritsGroupDefaults" -v
@@ -489,7 +491,7 @@ go test ./internal/ui/... -run "TestNewSessionFlowCreatesSessionWithTool|TestNew
 
 Expected: both FAIL — currently single Enter commits a session, so after step 0's Enter the mode is empty and later steps have no effect, or the session is created with the wrong tool.
 
-- [ ] **Step 3: Extend dialogState in dialog.go**
+- [x] **Step 3: Extend dialogState in dialog.go**
 
 Replace the `dialogState` struct:
 
@@ -509,7 +511,7 @@ type dialogState struct {
 }
 ```
 
-- [ ] **Step 4: Add expandPath and advanceNewSessionStep to dialog.go**
+- [x] **Step 4: Add expandPath and advanceNewSessionStep to dialog.go**
 
 Add these imports to dialog.go (add `"os"` and `"path/filepath"`):
 
@@ -574,7 +576,7 @@ func (m *Model) advanceNewSessionStep() {
 }
 ```
 
-- [ ] **Step 5: Update updateDialog for multi-step Enter and tool arrow keys**
+- [x] **Step 5: Update updateDialog for multi-step Enter and tool arrow keys**
 
 In `updateDialog`, add tool selection handling right after the `send-pane`/`broadcast` block and before the `switch msg.Type`:
 
@@ -639,7 +641,7 @@ func (m *Model) updateDialog(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 ```
 
-- [ ] **Step 6: Update renderDialog for tool selection step**
+- [x] **Step 6: Update renderDialog for tool selection step**
 
 Add a case for step 2 in `renderDialog`, before the final `return`:
 
@@ -675,7 +677,7 @@ func (m *Model) renderDialog() string {
 }
 ```
 
-- [ ] **Step 7: Update commitDialog "new-session" case to use multi-step fields**
+- [x] **Step 7: Update commitDialog "new-session" case to use multi-step fields**
 
 Replace the `case "new-session":` block in `commitDialog`:
 
@@ -706,7 +708,7 @@ case "new-session":
 	}
 ```
 
-- [ ] **Step 8: Update "new-session" action in updateNavigation (app.go) to set up multi-step dialog**
+- [x] **Step 8: Update "new-session" action in updateNavigation (app.go) to set up multi-step dialog**
 
 Add `"os"` to the imports in `app.go`.
 
@@ -756,7 +758,7 @@ case "new-session":
 	}
 ```
 
-- [ ] **Step 9: Update TestNewSessionDialogCreatesSession to go through all 4 steps**
+- [x] **Step 9: Update TestNewSessionDialogCreatesSession to go through all 4 steps**
 
 The existing test presses Enter once after the title, which now only advances to step 1 — the session is no longer created at that point. Update the test:
 
@@ -791,7 +793,7 @@ func TestNewSessionDialogCreatesSession(t *testing.T) {
 }
 ```
 
-- [ ] **Step 10: Run all UI tests to verify they pass**
+- [x] **Step 10: Run all UI tests to verify they pass**
 
 ```bash
 go test ./internal/ui/... -v
@@ -799,7 +801,7 @@ go test ./internal/ui/... -v
 
 Expected: all pass. Look for the two new tests and the updated `TestNewSessionDialogCreatesSession`.
 
-- [ ] **Step 11: Run full test suite**
+- [x] **Step 11: Run full test suite**
 
 ```bash
 go test ./...
@@ -807,7 +809,7 @@ go test ./...
 
 Expected: all pass.
 
-- [ ] **Step 12: Commit**
+- [x] **Step 12: Commit**
 
 ```bash
 git add internal/ui/dialog.go internal/ui/app.go internal/ui/app_test.go
@@ -823,7 +825,7 @@ git commit -m "feat(ui): multi-step new-session dialog with path, tool, and grou
 - Modify: `cmd/root.go` — deliver startup script before AttachSession
 - Modify: `internal/ui/app_test.go` — test PendingStartupScript is set for new sessions with a script
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 In `internal/ui/app_test.go`, add:
 
@@ -888,7 +890,7 @@ func TestPendingStartupScriptNotSetForExistingSession(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 go test ./internal/ui/... -run "TestPendingStartupScriptSetForNewSession|TestPendingStartupScriptNotSetForExistingSession" -v
@@ -896,7 +898,7 @@ go test ./internal/ui/... -run "TestPendingStartupScriptSetForNewSession|TestPen
 
 Expected: both FAIL — `PendingStartupScript` field does not exist on Model.
 
-- [ ] **Step 3: Add PendingStartupScript to Model and update ensureStarted in app.go**
+- [x] **Step 3: Add PendingStartupScript to Model and update ensureStarted in app.go**
 
 Add `PendingStartupScript string` to the `Model` struct (alongside `PendingAttach`):
 
@@ -953,7 +955,7 @@ case "attach":
 	}
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 go test ./internal/ui/... -run "TestPendingStartupScriptSetForNewSession|TestPendingStartupScriptNotSetForExistingSession" -v
@@ -961,7 +963,7 @@ go test ./internal/ui/... -run "TestPendingStartupScriptSetForNewSession|TestPen
 
 Expected: both pass.
 
-- [ ] **Step 5: Deliver startup script in launchTUI (cmd/root.go)**
+- [x] **Step 5: Deliver startup script in launchTUI (cmd/root.go)**
 
 In `launchTUI`, update the post-TUI block to deliver the startup script before attaching:
 
@@ -1000,7 +1002,7 @@ func launchTUI(conn *sql.DB, tc tmux.ClientIface) error {
 }
 ```
 
-- [ ] **Step 6: Run full test suite**
+- [x] **Step 6: Run full test suite**
 
 ```bash
 go test ./...
@@ -1008,7 +1010,7 @@ go test ./...
 
 Expected: all pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/ui/app.go internal/ui/app_test.go cmd/root.go

@@ -1,5 +1,7 @@
 # M2 Finish Observability Implementation Plan
 
+**Status: Complete** — all tasks implemented and verified. See `docs/superpowers/specs/2026-05-13-m2-finish-observability-design.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a context window % indicator parsed from Claude pane output, render it in the list and detail panel, and polish the existing waiting timer and fleet header with color treatment.
@@ -33,7 +35,7 @@
 
 Claude's pane output includes lines like `75% context used · /compact to reduce`. This task adds a pure parsing function that returns the integer percentage, or nil if the line doesn't match.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `internal/tmux/status_test.go`:
 
@@ -70,7 +72,7 @@ func intPtr(n int) *int { return &n }
 
 Add `"fmt"` to the imports in `status_test.go`.
 
-- [ ] **Step 2: Run test to confirm it fails**
+- [x] **Step 2: Run test to confirm it fails**
 
 ```bash
 go test ./internal/tmux/... -run TestParseContextPctDetectsPercentage -v
@@ -78,7 +80,7 @@ go test ./internal/tmux/... -run TestParseContextPctDetectsPercentage -v
 
 Expected: `FAIL` — `tmux.ParseContextPct` undefined.
 
-- [ ] **Step 3: Implement ParseContextPct**
+- [x] **Step 3: Implement ParseContextPct**
 
 Add to `internal/tmux/status.go` (add `"strconv"` to imports):
 
@@ -110,7 +112,7 @@ func ParseContextPct(output string) *int {
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 go test ./internal/tmux/... -v
@@ -118,7 +120,7 @@ go test ./internal/tmux/... -v
 
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/tmux/status.go internal/tmux/status_test.go
@@ -135,7 +137,7 @@ git commit -m "feat: add ParseContextPct to extract context window % from pane o
 
 The poller stores the latest parsed context % per session, protected by the existing `mu` mutex. A snapshot method provides a safe read for the UI layer.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `internal/state/poller_test.go`:
 
@@ -181,7 +183,7 @@ func TestPollerClearsContextPctWhenSessionStopped(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 go test ./internal/state/... -run "TestPollerStoresContextPct|TestPollerClearsContextPctWhenSessionStopped" -v
@@ -189,7 +191,7 @@ go test ./internal/state/... -run "TestPollerStoresContextPct|TestPollerClearsCo
 
 Expected: `FAIL` — `state.Poller` has no `ContextPctSnapshot` method.
 
-- [ ] **Step 3: Add contextPct field, setContextPct, clearSessionState update, ContextPctSnapshot, and PollOnce call**
+- [x] **Step 3: Add contextPct field, setContextPct, clearSessionState update, ContextPctSnapshot, and PollOnce call**
 
 In `internal/state/poller.go`, add `contextPct` field to the `Poller` struct:
 
@@ -286,7 +288,7 @@ p.setContextPct(s.ID, tmux.ParseContextPct(out))
 now := p.now()
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 go test ./internal/state/... -v
@@ -294,7 +296,7 @@ go test ./internal/state/... -v
 
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/state/poller.go internal/state/poller_test.go
@@ -311,7 +313,7 @@ git commit -m "feat: track context window % per session in poller"
 
 `renderContextBar` converts an integer 0–100 into a 4-block progress bar: `▓▓▓░ 75%`. `ListItem` gains `ContextPct *int` and `WaitOverdue bool`. `RenderList` renders the bar inline before the title and colors overdue wait labels.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `internal/ui/list_test.go`:
 
@@ -364,7 +366,7 @@ func TestRenderListNoBarWhenContextPctNil(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 go test ./internal/ui/... -run "TestRenderContextBar|TestRenderListShowsContextBar|TestRenderListNoBarWhenContextPctNil" -v
@@ -372,7 +374,7 @@ go test ./internal/ui/... -run "TestRenderContextBar|TestRenderListShowsContextB
 
 Expected: `FAIL` — `ui.RenderContextBar` undefined, `ListItem` missing `ContextPct`.
 
-- [ ] **Step 3: Add ContextPct, WaitOverdue to ListItem and implement renderContextBar**
+- [x] **Step 3: Add ContextPct, WaitOverdue to ListItem and implement renderContextBar**
 
 In `internal/ui/list.go`, update `ListItem`:
 
@@ -453,7 +455,7 @@ if selected {
 }
 ```
 
-- [ ] **Step 4: Run tests to confirm they pass**
+- [x] **Step 4: Run tests to confirm they pass**
 
 ```bash
 go test ./internal/ui/... -v
@@ -461,7 +463,7 @@ go test ./internal/ui/... -v
 
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/ui/list.go internal/ui/list_test.go
@@ -478,7 +480,7 @@ git commit -m "feat: add context bar rendering and overdue wait label color to l
 
 `Reload()` calls `poller.ContextPctSnapshot()` and stamps each waiting/running `ListItem` with `ContextPct`. `RenderDetailPanel` gains a `context:` line.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `internal/ui/app_test.go`. The detail panel test works by rendering with a `ListItem` that already has `ContextPct` set — since the model sets it during `Reload()` from the poller snapshot, we test the render output after `Reload()` with a real poller whose stub output contains a context line.
 
@@ -539,7 +541,7 @@ func TestDetailPanelNoContextLineWhenPctNil(t *testing.T) {
 
 The `fake.PaneOutput` field needs to exist on `FakeTmuxClient`. Check whether it already does — if not, it must be added in the next sub-step.
 
-- [ ] **Step 2: Check FakeTmuxClient and update if needed**
+- [x] **Step 2: Check FakeTmuxClient and update if needed**
 
 ```bash
 grep -n "PaneOutput\|CapturePaneOutput" /Users/anthonymirville/Projects/tmux-agent-deck/internal/testutil/tmux.go
@@ -578,7 +580,7 @@ grep -n "CapturePaneOutput\|SessionExists\|ClientIface" /Users/anthonymirville/P
 
 If `FakeTmuxClient` already satisfies `state.TmuxReader` (likely, since tests already pass a fake to the poller in `poller_test.go`), no change needed beyond adding `PaneOutput`.
 
-- [ ] **Step 3: Run tests to confirm they fail**
+- [x] **Step 3: Run tests to confirm they fail**
 
 ```bash
 go test ./internal/ui/... -run "TestDetailPanelShowsContextLine|TestDetailPanelNoContextLineWhenPctNil" -v
@@ -586,7 +588,7 @@ go test ./internal/ui/... -run "TestDetailPanelShowsContextLine|TestDetailPanelN
 
 Expected: `FAIL` — either compile error (missing `PaneOutput`) or assertion fails because `context:` line doesn't exist yet.
 
-- [ ] **Step 4: Add contextPct to Model and wire in Reload**
+- [x] **Step 4: Add contextPct to Model and wire in Reload**
 
 In `internal/ui/app.go`, add `contextPct` field to `Model`:
 
@@ -652,7 +654,7 @@ if m.poller != nil {
 }
 ```
 
-- [ ] **Step 5: Add context line to RenderDetailPanel**
+- [x] **Step 5: Add context line to RenderDetailPanel**
 
 In `internal/ui/app.go`, find `RenderDetailPanel`. After the status line (which already includes the wait label), add a context line. The current lines section looks like:
 
@@ -687,7 +689,7 @@ const sessionHeaderLines = 6 // title, group, conductor, tags, [context if prese
 
 The context line is conditional so the constant should remain 6 (the context line takes a slot from notes/output space only when present — this is acceptable). Verify rendering looks correct manually.
 
-- [ ] **Step 6: Run tests to confirm they pass**
+- [x] **Step 6: Run tests to confirm they pass**
 
 ```bash
 go test ./internal/ui/... -v
@@ -695,7 +697,7 @@ go test ./internal/ui/... -v
 
 Expected: all PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add internal/ui/app.go internal/ui/app_test.go internal/testutil/tmux.go
@@ -712,7 +714,7 @@ git commit -m "feat: wire context % from poller into model and detail panel"
 
 Color the header's waiting count (amber), error count (red), and overdue `!N` badge (bold red). The overdue wait label color in the list was already wired in Task 3 via `WaitOverdue`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `internal/ui/app_test.go`:
 
@@ -755,7 +757,7 @@ func TestHeaderColorsErrorRedWhenNonZero(t *testing.T) {
 
 These tests confirm the count text still appears (color is additive — lipgloss wraps with ANSI codes but the text remains). The `t.Skip` guards against headless environments where lipgloss may not emit ANSI.
 
-- [ ] **Step 2: Run tests to confirm they fail**
+- [x] **Step 2: Run tests to confirm they fail**
 
 ```bash
 go test ./internal/ui/... -run "TestHeaderColorsWaiting|TestHeaderColorsError" -v
@@ -763,7 +765,7 @@ go test ./internal/ui/... -run "TestHeaderColorsWaiting|TestHeaderColorsError" -
 
 Expected: `FAIL` — the current header uses `fmt.Sprintf` plain text, so `"1 waiting"` exists but we're checking correct format; tests may pass already. If they pass, adjust test to check for the ANSI escape presence around the count instead. Rerun to confirm current behavior.
 
-- [ ] **Step 3: Implement header color treatment**
+- [x] **Step 3: Implement header color treatment**
 
 In `internal/ui/app.go`, add styles (near the top of the file, alongside other style vars or at function scope in `renderAppHeader`):
 
@@ -808,7 +810,7 @@ func (m *Model) renderAppHeader() string {
 }
 ```
 
-- [ ] **Step 4: Run all tests**
+- [x] **Step 4: Run all tests**
 
 ```bash
 go test ./... -v 2>&1 | tail -20
@@ -816,7 +818,7 @@ go test ./... -v 2>&1 | tail -20
 
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add internal/ui/app.go internal/ui/app_test.go

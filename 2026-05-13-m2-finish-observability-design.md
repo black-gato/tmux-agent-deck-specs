@@ -58,7 +58,9 @@ tmux pane output
 
 **Context % not persisted.** Storing it in the DB would require a schema migration and constant writes on every poll cycle for a value that resets anyway. In-memory via the poller's `contextPct map[string]*int` is sufficient.
 
-**`ParseContextPct` is separate from `DetectStatus`.** No signature change to `DetectStatus`. The two concerns are independent — status detection is tool-aware, context % parsing is not.
+**`ParseContextPct` is separate from `DetectStatus`.** No signature change to `DetectStatus` as part of M2. The two concerns are independent — status detection is tool-aware, context % parsing is not.
+
+> **Post-implementation note (2026-05-15):** `DetectStatus` signature was subsequently changed by the BUG-005 fix to `DetectStatus(output string, lastChange, now time.Time, tool string)`. The `now` parameter replaced the internal `time.Since(lastChange)` call so the poller's injected clock is used consistently, and the idle check was moved before the spinner/Thinking heuristic to fix stale-output false positives. See `docs/bugs.md` BUG-005 for full details.
 
 **Pattern matching.** Lines must contain `context used`, `context window`, or `% context` to avoid false positives from unrelated percentage values.
 
