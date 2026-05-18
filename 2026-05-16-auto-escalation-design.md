@@ -115,3 +115,68 @@ Errors from `autoEscalate` are logged (`log.Printf`) and discarded — same patt
 3. **Escalation sent as a single-line message.** The escalation message is passed to `SendKeys` as one call rather than line-by-line, to avoid tmux interpreting embedded newlines as separate key events.
 
 4. **E2E test added** in `test/e2e/` that spins up real tmux sessions and verifies the full auto-escalation path end-to-end.
+
+---
+
+## Iteration 2 — 2026-05-17 Improvements
+
+### Escalation submission fix
+
+The original implementation sent the escalation message via `SendKeys` (which uses `tmux send-keys -l`) but never submitted it — the conductor received the text typed into its prompt but the agent did not execute it. Fixed by adding `SendRawKeys(session, 0, "Enter")` after `SendKeys`, matching the pattern used by the manual `C` escalation in `ui/app.go`.
+
+`TmuxSender` interface updated to include `SendRawKeys`:
+
+```go
+type TmuxSender interface {
+    SendKeys(session string, pane int, keys string) error
+    SendRawKeys(session string, pane int, keys string) error
+}
+```
+
+### Context line filtering
+
+`escalationMessage` previously included the last 3 raw lines of pane output as context. Terminal UI chrome (prompt lines, status bar, separator characters) was polluting the context sent to the conductor.
+
+`tailLines` replaced with `contextLines` + `isContextLine` filter:
+
+- Scans backward through output, collecting up to 5 non-empty lines
+- Skips: bare `>` or `❯` prompt lines, lines containing `-- INSERT --`, lines matching the Claude status bar pattern (`ctx:` and `@`)
+- Skips: lines that are entirely separator characters (`─━═-`)
+- Reverses the collected lines to restore chronological order
+
+Context window expanded from 3 to 5 lines to compensate for filtered noise.
+
+### Claude prompt detection improvement (`internal/tmux/status.go`)
+
+`DetectStatus` for the `claude` tool previously checked only the last line for a `>` prompt. Claude's terminal output often has trailing empty lines or status bar lines after the actual prompt, causing the prompt to be missed.
+
+Fixed by scanning the most recent 8 non-empty lines via `recentNonEmptyLines`:
+
+```go
+case isClaudeTool(tool):
+    for _, line := range recentNonEmptyLines(trimmed, 8) {
+        if isAgentPromptLine(line) {
+            return StatusWaiting
+        }
+    }
+```
+
+`isAgentPromptLine` matches `">"` and `"❯"` exactly (trimmed), so partial matches are not false positives.
+
+Also added `lastNonEmptyLine` helper used by other tool cases to avoid being fooled by trailing whitespace/newlines in pane output.
+
+---
+
+## Iteration 3 — 2026-05-18 Status Detection Hardening
+
+Claude prompt detection was hardened after a real `claude-dangerous` session showed a visible `❯` prompt but still transitioned to `idle`.
+
+Two additional cases are now covered:
+
+- ANSI-wrapped prompts from `tmux capture-pane`, such as `\x1b[32m❯\x1b[0m`, are normalized by stripping ANSI CSI escape sequences before status matching.
+- Claude-family tool names (`claude` and `claude-*`) use the Claude footer-aware detector. This includes the `claude-dangerous` preset, which previously fell through to shell-style detection and missed prompts above Claude's footer.
+
+Regression tests:
+
+- `TestDetectStatusClaudePromptWithANSI`
+- `TestDetectStatusClaudePresetPromptAboveStatusFooter`

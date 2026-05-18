@@ -2,7 +2,104 @@
 
 Tracked bugs in tmux-agent-deck. Newest first. Status: `open`, `in-progress`, `fixed`.
 
-Current repo status as of 2026-05-17: All bugs BUG-001 through BUG-012 are fixed. No open bugs.
+Current repo status as of 2026-05-18: BUG-013 is open. BUG-014 and BUG-001 through BUG-012 are fixed.
+
+---
+
+## BUG-014: Claude-family prompt screens can be misclassified as `idle`
+
+**Reported:** 2026-05-18
+**Status:** fixed
+**Severity:** medium (waiting agents are missed, so notifications and auto-escalation do not fire)
+
+### Symptom
+
+A Claude session can visibly show the `❯` prompt above the Claude footer but transition from `running` to `idle` instead of `waiting` after the pane has been quiet for 30 seconds.
+
+Observed example:
+
+```text
+✻ Brewed for 25s
+────────────────────────
+❯
+────────────────────────
+  anthonymirville@host tmux-agent-deck (main) [Sonnet 4.6] ctx:14%
+  -- INSERT -- ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+```
+
+### Root cause
+
+Two prompt-detection gaps caused the visible prompt to be missed:
+
+1. `tmux capture-pane` can preserve ANSI color sequences around the prompt, e.g. `\x1b[32m❯\x1b[0m`. `isAgentPromptLine` compared the raw line to `"❯"`, so colored prompts did not match.
+2. The `claude-dangerous` preset stores `Tool` as `"claude-dangerous"`. `DetectStatus` only used Claude-specific footer-aware prompt detection when `tool == "claude"`, so the preset fell through to shell-style detection, which only checks the final line.
+
+Once both checks missed the prompt, the stale-output idle fallback returned `idle`.
+
+### Resolution
+
+`internal/tmux/status.go` now strips ANSI CSI escape sequences before status heuristics run and treats Claude-family tools (`claude` and `claude-*`) as Claude for prompt detection. That means `claude-dangerous` scans the most recent 8 non-empty lines for a bare `>` or `❯`, matching normal Claude behavior.
+
+### Files touched
+
+- `internal/tmux/status.go`
+- `internal/tmux/status_test.go`
+
+### Tests
+
+- `internal/tmux/status_test.go` — `TestDetectStatusClaudePromptWithANSI`
+- `internal/tmux/status_test.go` — `TestDetectStatusClaudePresetPromptAboveStatusFooter`
+- `go test ./internal/tmux -run TestDetectStatus -v`
+- `go test ./...`
+
+---
+
+## BUG-013: per-session tool flags are not passed to the agent process
+
+**Reported:** 2026-05-17
+**Status:** open
+**Severity:** high (the flags field in the new-session dialog has no effect)
+
+### Symptom
+
+Creating a session with `ToolFlags` set (e.g. `--dangerously-skip-permissions`, `--model opus`, `--resume`) starts the agent normally but ignores the flags entirely. The flags are stored in the DB and visible in the detail panel, but the agent process does not receive them as command-line arguments.
+
+### What was tried
+
+Two approaches were attempted and both failed to reliably apply flags:
+
+**Approach 1 — pass combined string to `tmux new-session`**
+
+`buildLaunchCommand("claude", "--flags")` returns `"claude --flags"` as a single string, passed as the final positional arg to `tmux new-session`. Tmux is expected to run `$SHELL -c "claude --flags"`, which should correctly parse flags. In practice the agent started but flags were not applied. Root cause not confirmed — possible tmux version behavior or PATH interaction.
+
+**Approach 2 — start bare shell, send command via `send-keys -l`**
+
+`ensureStarted` started the session with no shell command (bare zsh). `PendingStartupScript` was set to `"claude --flags\n"` and sent via `tmux send-keys -l` before attach. The literal `\n` (LF byte, 0x0A) was intended to execute the command, but this is unreliable: PTY canonical mode may not treat a bare LF as Enter in all configurations.
+
+### Current workaround
+
+A `claude-dangerous` preset tool option was added that maps to `claude --dangerously-skip-permissions` via `resolveLaunchCommand`. This is a hardcoded workaround for the most common flag use case; it does not solve the general problem.
+
+### Root cause (suspected)
+
+The interaction between `exec.Command("tmux", ...)`, tmux's shell-command argument handling, and the user's shell environment needs more investigation. Specifically:
+
+1. Whether tmux correctly invokes `$SHELL -c "tool --flags"` when the shell command is passed as a single quoted string via execve (no shell interpolation).
+2. Whether the user's login PATH (needed to find the `claude` binary) is available in the non-login shell tmux spawns.
+3. Whether `tmux send-keys -l` with a literal LF byte reliably executes a command in all PTY/shell configurations.
+
+### Planned fix
+
+Investigate and confirm which mechanism correctly passes argv to the agent. Likely correct approaches:
+
+1. **Explicit shell invocation** — change `NewSession` to always wrap the command: `zsh -l -c 'claude --flags'`. The login shell (`-l`) ensures PATH is populated; quoting the command string as a single arg to `-c` ensures flags are passed correctly.
+2. **Send-keys with explicit Enter** — keep the bare-shell approach but replace the `\n` byte in `PendingStartupScript` with a separate `SendRawKeys(session, 0, "Enter")` call after `SendKeys`, matching the pattern used for conductor escalation.
+
+### Files likely touched
+
+- `internal/tmux/client.go` — `NewSession`, `buildLaunchCommand`
+- `internal/ui/app.go` — `ensureStarted`
+- `cmd/root.go` — `PendingStartupScript` send logic
 
 ---
 
