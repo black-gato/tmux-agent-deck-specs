@@ -369,6 +369,7 @@ git commit -m "feat(db): add startup_script column (schema v5)"
 - Enter at step 3 commits as normal
 - Esc always cancels entirely (no step-back)
 - `savedPath` is pre-filled from group default or `os.Getwd()` when the dialog opens; it becomes the initial value shown to the user at step 1
+- New-session group context is resolved from the cursor: group rows use that group path, session rows use that session's `GroupPath`, and only missing/unknown rows fall back to `my-sessions`
 
 - [x] **Step 1: Write the failing test**
 
@@ -686,10 +687,7 @@ case "new-session":
 	if m.dialog.savedTitle == "" {
 		return
 	}
-	groupPath := defaultGroupPath
-	if m.cursor < len(m.items) && m.items[m.cursor].Kind == "group" {
-		groupPath = m.items[m.cursor].Group.Path
-	}
+	groupPath := m.currentGroupPath()
 	path := strings.TrimSpace(m.dialog.savedPath)
 	if path == "" {
 		path = "."
@@ -721,15 +719,7 @@ case "new-session":
 		defaultPath = wd
 	}
 	defaultTool := "claude"
-	var cursorGroupPath string
-	if m.cursor < len(m.items) {
-		item := m.items[m.cursor]
-		if item.Kind == "group" {
-			cursorGroupPath = item.Group.Path
-		} else if item.Kind == "session" {
-			cursorGroupPath = item.Session.GroupPath
-		}
-	}
+	cursorGroupPath := m.currentGroupPath()
 	for _, g := range m.groups {
 		if g.Path == cursorGroupPath {
 			if g.DefaultPath != "" {
@@ -800,6 +790,10 @@ go test ./internal/ui/... -v
 ```
 
 Expected: all pass. Look for the two new tests and the updated `TestNewSessionDialogCreatesSession`.
+
+- [x] **Step 10a: Add regression coverage for session-row group context**
+
+Add `TestNewSessionFromSelectedSessionUsesItsGroup` to cover the cursor-on-session case. The test creates a `work` group with an existing session, moves the cursor to that session row, opens `n`, completes the new-session flow, and asserts the created session has `GroupPath == "work"` instead of falling back to `my-sessions`.
 
 - [x] **Step 11: Run full test suite**
 

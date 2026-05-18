@@ -122,7 +122,7 @@ Sessions inherit `default_tool` and `default_path` from their group at creation 
 | Key | Action |
 |-----|--------|
 | `Enter` | Attach to session |
-| `n` | New session in current group |
+| `n` | New session in current group (selected group row or selected session's group) |
 | `e` | Edit notes or group defaults |
 | `x` | Send keys to active pane |
 | `f` | Fork session |
