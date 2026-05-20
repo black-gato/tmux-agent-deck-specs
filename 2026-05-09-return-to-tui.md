@@ -1,5 +1,7 @@
 # Return to TUI Keybinding Implementation Plan
 
+**Status: Complete**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** When a user attaches to an agent session, automatically bind `ctrl + q` (`C-q` in the tmux `root` table) to `detach-client` so they can return to the TUI with a single keystroke, then restore the original binding on return.

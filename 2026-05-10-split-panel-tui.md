@@ -1,5 +1,7 @@
 # Split Panel TUI Implementation Plan
 
+**Status: Complete**
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Redesign the TUI from a single-column session list to a persistent split layout with a session detail panel showing live output, pane info, and editable notes.

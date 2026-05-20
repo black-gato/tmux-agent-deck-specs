@@ -1,5 +1,7 @@
 # Conductor Enhancements Implementation Plan
 
+**Status:** Implemented (2026-05-19)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Extend conductor mode with reply-to-worker routing, a configurable heartbeat digest, and optional CLAUDE.md initialization so a conductor session can supervise workers with less manual relay.
