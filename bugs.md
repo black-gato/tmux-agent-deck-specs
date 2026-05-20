@@ -2,7 +2,34 @@
 
 Tracked bugs in tmux-agent-deck. Newest first. Status: `open`, `in-progress`, `fixed`.
 
-Current repo status as of 2026-05-18: BUG-013 is open. BUG-014 and BUG-001 through BUG-012 are fixed.
+Current repo status as of 2026-05-19: BUG-013 is open. BUG-015 was filed but invalid (the parser already extracted the body; no change required to close the reported behaviour). BUG-014 and BUG-001 through BUG-012 are fixed.
+
+---
+
+## BUG-015: conductor reply parser claimed to forward entire response (invalid)
+
+**Reported:** 2026-05-18
+**Status:** closed — invalid (incorrect diagnosis); a defensive guard was added regardless
+**Severity:** n/a
+
+### Summary
+
+Originally filed asserting that the conductor reply parser forwarded the conductor's entire response to the worker instead of the text between `@deck-reply` and `@deck-end`. Investigation showed `ParseReplyBlocks` in `internal/state/reply.go` already extracts only the body, and `scanConductorReplies` in `internal/state/poller.go` already sends only that body. Points 1–3 of the originally proposed fix were already implemented before the bug was filed.
+
+Point 4 of the proposed fix (reject payloads that themselves contain `@deck-reply` to prevent feedback loops) was a defensive improvement worth adding even though workers are not scanned for reply blocks (no actual loop exists). Implemented in this branch.
+
+### Related changes in this branch
+
+- Dropped the `Conductor reply: ` prefix; the worker now receives the raw extracted body.
+- Reject bodies that contain `@deck-reply` and log a warning instead of forwarding.
+- `ParseReplyBlocks` now uses `LastIndex` for `@deck-end` in the single-line form and only treats `@deck-end` as the terminator in the multi-line form when it appears at the end of a line — so a body may legitimately mention the string `@deck-end` without being truncated.
+
+### Files touched
+
+- `internal/state/reply.go`
+- `internal/state/poller.go`
+- `internal/state/reply_test.go`
+- `internal/state/poller_test.go`
 
 ---
 
