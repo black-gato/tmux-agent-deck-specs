@@ -2,7 +2,41 @@
 
 Tracked bugs in tmux-agent-deck. Newest first. Status: `open`, `in-progress`, `fixed`.
 
-Current repo status as of 2026-05-22: BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+Current repo status as of 2026-05-22: BUG-017 fixed. BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+
+---
+
+## BUG-017: broadcast/send-pane text not sent when Claude Code is in vim normal mode
+
+**Reported:** 2026-05-22
+**Status:** fixed
+**Severity:** high
+
+### Summary
+
+When Claude Code's vim keybinding mode was active and a session was in normal mode (not insert mode), text sent via send-pane (`x`) or broadcast (`b`) was interpreted as vim commands rather than typed text, corrupting the session state.
+
+### Root Cause
+
+`sendToPane()` sent text via `tmux send-keys -l` (literal bytes) with no awareness of the target session's vim mode. Literal bytes in vim normal mode are interpreted as vim commands (e.g. `h`=move left, `i`=enter insert, `d`=delete). A manual `Ctrl+V` toggle was added (see BUG-017 initial fix) to prepend `Escape+i` before text, but it was a single global switch — broadcast users couldn't know which sessions were in normal vs insert mode without checking each one manually.
+
+### Fix
+
+Per-pane auto-detection using `CapturePaneView` (new `ClientIface` method, runs `tmux capture-pane -t <target> -p` for current visible content):
+
+- For `session.Tool == "claude"` or `"claude-dangerous"`: check pane content for `-- INSERT --`. If found → session already in insert mode, send text directly. If not found → session is in normal mode, prepend `Escape+i` to normalize to insert mode.
+- For non-claude sessions: fall back to the manual `Ctrl+V` toggle (`dialog.vimMode`).
+
+`Escape+i` is safe for Claude Code readline-vi mode regardless of current state: in insert mode, `Escape` exits to normal and `i` re-enters insert with no cursor drift; in normal mode, `Escape` is a no-op and `i` enters insert.
+
+The manual `Ctrl+V` toggle is retained as an override for non-claude vim sessions (e.g. nvim, aider with vim bindings).
+
+### Affected files
+
+- `internal/tmux/client.go` — added `CapturePaneView(session, paneIndex)` to `ClientIface` and `*Client`
+- `internal/testutil/tmux.go` — added `PaneViews map[string]string` to `FakeTmuxClient`, implemented `CapturePaneView`
+- `internal/ui/dialog.go` — `sendToPane` now takes `tool string` param; added `isClaudeTool()` and `isInVimInsertMode()` helpers; all call sites updated
+- `internal/ui/app_test.go` — three new regression tests covering INSERT-mode skip, normal-mode prefix, and per-session broadcast auto-detection
 
 ---
 
