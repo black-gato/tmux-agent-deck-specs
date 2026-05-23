@@ -2,7 +2,120 @@
 
 Tracked bugs in tmux-agent-deck. Newest first. Status: `open`, `in-progress`, `fixed`.
 
-Current repo status as of 2026-05-22: BUG-017 fixed. BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+Current repo status as of 2026-05-23: BUG-020 fixed. BUG-019 fixed. BUG-018 fixed. BUG-017 fixed. BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+
+---
+
+## BUG-020: broadcast only reaches conductor — Escape+i misread as Meta-i by readline
+
+**Reported:** 2026-05-23
+**Status:** fixed
+**Severity:** high
+
+### Summary
+
+When broadcasting to multiple sessions in the same group, only the conductor received the message. Worker sessions in readline vi COMMAND mode were silently skipped even though the status and scope filters passed.
+
+### Root Cause
+
+`sendToPane` sent an `Escape` raw key followed by `i` to enter INSERT mode when a session showed no `-- INSERT --` indicator. These are two separate `exec.Command` calls:
+
+```
+SendRawKeys(session, 0, "Escape")   // exec #1: tmux send-keys ... Escape
+SendKeys(session, 0, "i")           // exec #2: tmux send-keys -l ... i
+```
+
+The processes run back-to-back and both complete in a few milliseconds. Readline's vi mode applies a ~100ms escape-sequence timeout: 0x1B (Escape) followed by 0x69 (`i`) within that window is interpreted as `Meta-i`, not as separate `Escape` then `i`. `Meta-i` is unbound or a no-op in COMMAND mode, so the session stays in COMMAND mode. The message text then arrives as COMMAND-mode keys (vim motion commands) and nothing is submitted.
+
+The conductor was unaffected because it showed `-- INSERT --` (already in INSERT mode), so no `Escape+i` was ever sent to it.
+
+### Fix
+
+Removed the `Escape` step entirely. When a session is in COMMAND mode (no `-- INSERT --` detected), only `i` is sent via `SendKeys`. In readline vi COMMAND mode, `i` alone unambiguously enters INSERT mode with no escape-sequence ambiguity.
+
+The only side effect: if a session is in INSERT mode but was misdetected as COMMAND mode (e.g. the indicator scrolled off the visible area), a stray `i` character is typed at the head of the input before the message. This is a minor cosmetic inconvenience and far preferable to total message loss.
+
+### Affected files
+
+- `internal/ui/dialog.go` — removed `SendRawKeys(Escape)` from `sendToPane`
+- `internal/ui/app_test.go` — updated tests expecting `Escape` raw key to instead expect `i` via `SendKeys`
+
+---
+
+## BUG-019: send-pane and broadcast text typed into session but never submitted
+
+**Reported:** 2026-05-23
+**Status:** fixed
+**Severity:** high
+
+### Summary
+
+Text sent via send-pane (`x`) or broadcast (`b`) appeared as typed characters in the target pane's readline buffer but was never submitted. After several interactions, each pane accumulated a pile of unsubmitted text.
+
+### Root Cause
+
+`sendToPane` in `internal/ui/dialog.go` sent text and ctrl keys to the target session but did not send Enter. The user pressing Enter in the dialog closed the dialog (triggering `commitDialog`) but that Enter was never forwarded to the target pane.
+
+### Fix
+
+Added `return m.tmuxC.SendRawKeys(session, paneIndex, "Enter")` as the final statement in `sendToPane`. Every send-pane and broadcast operation now terminates with Enter, submitting the message to the target session's readline.
+
+### Affected files
+
+- `internal/ui/dialog.go` — added final `SendRawKeys(Enter)` to `sendToPane`
+- `internal/ui/app_test.go` — all send-pane/broadcast tests updated to expect Enter as the last raw key
+
+---
+
+## BUG-018: install-hooks wrote flat hook entries that Claude Code silently ignores
+
+**Reported:** 2026-05-23
+**Status:** fixed
+**Severity:** high
+
+### Summary
+
+Running `tmux-agent-deck install-hooks` reported success but Claude Code never called `tmux-agent-deck hook-handler` on any lifecycle event. The hooks were silently ignored.
+
+### Root Cause
+
+Claude Code's `settings.json` hooks schema requires each entry in an event array to be a **hook group object** — an object with a `"hooks"` array containing the actual command objects:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "tmux-agent-deck hook-handler", "async": true }] }
+    ]
+  }
+}
+```
+
+`install-hooks` was writing bare command objects directly into the event arrays:
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "type": "command", "command": "tmux-agent-deck hook-handler", "async": true }
+    ]
+  }
+}
+```
+
+Claude Code accepts this format without error but does not execute the hooks. The `{"hooks": [...]}` wrapper is required. This was discovered by comparing a working hook registered by another tool (`agent-deck`) with the non-working entries written by `tmux-agent-deck`.
+
+### Fix
+
+Changed `buildEntry()` in `cmd/installhooks.go` to produce the wrapped format. Updated `hasOurEntry()` and `removeOurEntry()` to recognise both the old flat format (for migration) and the new wrapped format, so existing installations are correctly detected and cleaned up on `--uninstall`.
+
+The hook-handler design spec (`docs/superpowers/specs/2026-05-23-hook-handler-design.md`) was also corrected to show the wrapped format.
+
+### Affected files
+
+- `cmd/installhooks.go` — `buildEntry`, `hasOurEntry`, `removeOurEntry`
+- `cmd/installhooks_test.go` — added `countWrappedCommand` helper; updated all tests to verify wrapped format
+- `docs/superpowers/specs/2026-05-23-hook-handler-design.md` — format description corrected
 
 ---
 
