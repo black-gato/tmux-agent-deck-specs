@@ -2,7 +2,33 @@
 
 Tracked bugs in tmux-agent-deck. Newest first. Status: `open`, `in-progress`, `fixed`.
 
-Current repo status as of 2026-05-19: BUG-013 is open. BUG-015 was filed but invalid (the parser already extracted the body; no change required to close the reported behaviour). BUG-014 and BUG-001 through BUG-012 are fixed.
+Current repo status as of 2026-05-22: BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+
+---
+
+## BUG-016: up/down arrow keys do not navigate new-session form fields
+
+**Reported:** 2026-05-22
+**Status:** fixed
+**Severity:** medium
+
+### Summary
+
+Pressing ↑/↓ while the new-session form was open had no effect on field focus. The form was navigable only via Tab.
+
+### Root Cause
+
+In `updateForm()` (`internal/ui/form.go`), `tea.KeyUp` and `tea.KeyDown` were modifying `m.cursor` (the session-list position) instead of `m.form.focusField` (the active form field index). Because the list cursor is never rendered while the form is visible, the key presses appeared to do nothing.
+
+### Fix
+
+Changed the `KeyUp`/`KeyDown` branches in `updateForm()` to increment/decrement `m.form.focusField`, clamped to `[0, len(fields)-1]`. Added a regression test `TestNewSessionFormDownUpNavigatesFields` in `internal/ui/app_test.go`. Updated the key-bindings table in `docs/superpowers/specs/2026-05-17-session-form-design.md` to document the Down/Up bindings.
+
+### Affected files
+
+- `internal/ui/form.go` — bug fix
+- `internal/ui/app.go` — added `FormFocusField()` accessor for testing
+- `internal/ui/app_test.go` — regression test
 
 ---
 

@@ -59,6 +59,7 @@ Text fields render a block cursor at the current rune index using lipgloss rever
 | Key | Behavior |
 |-----|----------|
 | Tab | **Path field:** cycle through completions one by one; when candidates exhausted, advance focus to next field. **All other fields:** advance focus to next field. |
+| Down / Up | Move focus to the next / previous field. Clamped at first and last field. |
 | Space | **Tool field:** advance focus. **Path field mid-cycle:** select current candidate and advance focus. **Text fields:** insert a space character. |
 | Enter | Submit the form from any field. |
 | Left / Right | **Text fields:** move cursor left/right. **Tool field:** cycle options left/right. |
