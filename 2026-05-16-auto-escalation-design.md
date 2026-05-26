@@ -180,3 +180,17 @@ Regression tests:
 
 - `TestDetectStatusClaudePromptWithANSI`
 - `TestDetectStatusClaudePresetPromptAboveStatusFooter`
+
+---
+
+## Planned Follow-Up — Conductor Enhancements
+
+Auto-escalation is currently one-way: worker sessions can escalate to a conductor, but the app does not automatically route the conductor's answer back to the worker.
+
+The planned conductor enhancement spec is documented in `docs/superpowers/specs/2026-05-18-conductor-enhancements-plan.md` and covers:
+
+- Explicit `@deck-reply worker=<session-id>` reply blocks
+- Poller-based conductor pane scanning
+- Automatic delivery of conductor replies back to workers
+- Tunable `--conductor-heartbeat` digests
+- Optional `--init-conductor-docs` managed `CLAUDE.md` conductor role setup

@@ -2,7 +2,61 @@
 
 Tracked bugs in tmux-agent-deck. Newest first. Status: `open`, `in-progress`, `fixed`.
 
-Current repo status as of 2026-05-23: BUG-020 fixed. BUG-019 fixed. BUG-018 fixed. BUG-017 fixed. BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+Current repo status as of 2026-05-25: BUG-021 open. BUG-020 fixed. BUG-019 fixed. BUG-018 fixed. BUG-017 fixed. BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+
+---
+
+## BUG-021: hook-handler conductor updates never arrive; install-hooks leaves duplicate registrations
+
+**Reported:** 2026-05-25
+**Status:** open
+**Severity:** medium (real-time hook-driven conductor updates silently do nothing; poller escalation is unaffected and still works)
+
+### Summary
+
+Claude Code lifecycle hooks are registered in `~/.claude/settings.json`, but no hook-driven `[deck] <title> | <event>` messages ever reach a conductor pane. Every conductor shows only poller-driven `Escalation from poller | ...` lines. So in practice the hook handler — meant to give the conductor *real-time* updates ahead of the poll cycle — produces nothing.
+
+Separately, every event is registered **twice**: once as `agent-deck hook-handler` and once as `tmux-agent-deck hook-handler`. If the hook path worked, each lifecycle event would fire the handler twice, producing duplicate conductor messages on top of the poller escalation.
+
+### Observed evidence (2026-05-25)
+
+- Registered events (`~/.claude/settings.json` `hooks`): `Notification`, `PermissionRequest`, `PreCompact`, `SessionEnd`, `SessionStart`, `Stop`, `UserPromptSubmit` — each listing both `agent-deck hook-handler` and `tmux-agent-deck hook-handler`.
+- Both binaries are on PATH: `/opt/homebrew/bin/agent-deck` and `~/go/bin/tmux-agent-deck`. The running deck is a third path: `./tmux-agent-deck`.
+- `capture-pane | grep '^\[deck\] '` across `tma-golang-*`, `tma-ttester-*`, `agentdeck_condutor_*` → **no matches**.
+- `capture-pane | grep 'Escalation from'` → poller escalations present, as expected.
+
+### Two distinct issues
+
+**A. Hook path is silent.** No `[deck]` messages despite registration.
+
+**B. Duplicate registrations.** `install-hooks` (or repeated runs under two binary names) left both `agent-deck` and `tmux-agent-deck` entries for every event.
+
+### Root cause (suspected — NOT yet confirmed)
+
+`runHookHandlerWith` (`cmd/hookhandler.go:50`) returns silently at several early exits (hooks are fire-and-forget, so no error surfaces):
+
+1. `resolveCurrentTmuxSession` (`tmux display-message -p #S`) fails or is empty in the hook subprocess environment.
+2. `GetSessionByTmuxName` finds no row — most likely if the registered `agent-deck` / `tmux-agent-deck` binaries open a **different `state.db`** than the running deck (`~/.tmux-agent-deck/state.db`). A stale homebrew `agent-deck` could default to a different path/schema.
+3. No group conductor set, or the conductor is the firing session itself (`hookhandler.go:66-75`).
+
+Issue (2) is the leading hypothesis: a different/older binary pointed at different state can't resolve the session→conductor mapping and returns at `hookhandler.go:61-69`.
+
+### Investigation plan
+
+1. Run the handler manually from a tracked worker's environment with a synthetic event and add temporary logging at each early return:
+   `echo '{"hook_event_name":"Stop"}' | tmux-agent-deck hook-handler` (executed inside a tracked tmux session).
+2. Confirm which `state.db` each registered binary opens (`agent-deck` vs `tmux-agent-deck` vs the running `./tmux-agent-deck`).
+3. Verify `TMUX` env / `#S` resolution succeeds inside the hook subprocess.
+
+### Follow-up: de-duplicate registrations
+
+`install-hooks` should not leave both `agent-deck` and `tmux-agent-deck` entries. Either have `hasOurEntry`/`removeOurEntry` recognise both binary names as "ours" and collapse to one, or document that only one binary name should be installed.
+
+### Affected files (likely)
+
+- `cmd/hookhandler.go` — early-return paths; consider a debug log when hooks are configured but no conductor message is sent
+- `cmd/installhooks.go` — duplicate-registration detection across binary names
+- `~/.claude/settings.json` — user config to clean up
 
 ---
 
