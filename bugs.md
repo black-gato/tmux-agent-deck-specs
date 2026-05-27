@@ -2,14 +2,14 @@
 
 Tracked bugs in tmux-agent-deck. Newest first. Status: `open`, `in-progress`, `fixed`.
 
-Current repo status as of 2026-05-25: BUG-021 open. BUG-020 fixed. BUG-019 fixed. BUG-018 fixed. BUG-017 fixed. BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+Current repo status as of 2026-05-27: BUG-021 fixed. BUG-020 fixed. BUG-019 fixed. BUG-018 fixed. BUG-017 fixed. BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
 
 ---
 
 ## BUG-021: hook-handler conductor updates never arrive; install-hooks leaves duplicate registrations
 
 **Reported:** 2026-05-25
-**Status:** open
+**Status:** fixed
 **Severity:** medium (real-time hook-driven conductor updates silently do nothing; poller escalation is unaffected and still works)
 
 ### Summary
@@ -31,32 +31,23 @@ Separately, every event is registered **twice**: once as `agent-deck hook-handle
 
 **B. Duplicate registrations.** `install-hooks` (or repeated runs under two binary names) left both `agent-deck` and `tmux-agent-deck` entries for every event.
 
-### Root cause (suspected — NOT yet confirmed)
+### Root cause
 
-`runHookHandlerWith` (`cmd/hookhandler.go:50`) returns silently at several early exits (hooks are fire-and-forget, so no error surfaces):
+The hook handler opened the DB and resolved identity via runtime tmux lookup with silent failures; it was replaced by env-var identity plus atomic status files read by the poller. `install-hooks` now strips the duplicate `agent-deck hook-handler` registration.
 
-1. `resolveCurrentTmuxSession` (`tmux display-message -p #S`) fails or is empty in the hook subprocess environment.
-2. `GetSessionByTmuxName` finds no row — most likely if the registered `agent-deck` / `tmux-agent-deck` binaries open a **different `state.db`** than the running deck (`~/.tmux-agent-deck/state.db`). A stale homebrew `agent-deck` could default to a different path/schema.
-3. No group conductor set, or the conductor is the firing session itself (`hookhandler.go:66-75`).
+### Fix
 
-Issue (2) is the leading hypothesis: a different/older binary pointed at different state can't resolve the session→conductor mapping and returns at `hookhandler.go:61-69`.
+Deck-managed tmux sessions now receive `AGENTDECK_INSTANCE_ID=<session-id>` through `tmux new-session -e`. Claude hook subprocesses inherit that identity, and `tmux-agent-deck hook-handler` writes `~/.tmux-agent-deck/hooks/<session-id>.json` without touching tmux or the DB.
 
-### Investigation plan
-
-1. Run the handler manually from a tracked worker's environment with a synthetic event and add temporary logging at each early return:
-   `echo '{"hook_event_name":"Stop"}' | tmux-agent-deck hook-handler` (executed inside a tracked tmux session).
-2. Confirm which `state.db` each registered binary opens (`agent-deck` vs `tmux-agent-deck` vs the running `./tmux-agent-deck`).
-3. Verify `TMUX` env / `#S` resolution succeeds inside the hook subprocess.
-
-### Follow-up: de-duplicate registrations
-
-`install-hooks` should not leave both `agent-deck` and `tmux-agent-deck` entries. Either have `hasOurEntry`/`removeOurEntry` recognise both binary names as "ours" and collapse to one, or document that only one binary name should be installed.
+The poller reads fresh hook status files on a 250ms loop, applies hook status with precedence over pane scraping, and pushes an immediate TUI refresh. Conductor notification and auto-escalation remain in the 1s poll loop with separate edge tracking so the fast hook loop does not double-fire notifications.
 
 ### Affected files (likely)
 
-- `cmd/hookhandler.go` — early-return paths; consider a debug log when hooks are configured but no conductor message is sent
-- `cmd/installhooks.go` — duplicate-registration detection across binary names
-- `~/.claude/settings.json` — user config to clean up
+- `cmd/hookhandler.go` — writes file-based hook status only
+- `internal/hook/status.go` — atomic JSON status-file protocol
+- `internal/state/poller.go` — fast hook loop, hook precedence, edge-tracked waiting notifications
+- `internal/tmux/client.go` — injects `AGENTDECK_INSTANCE_ID` into new tmux sessions
+- `cmd/installhooks.go` — strips legacy `agent-deck hook-handler` registrations on install
 
 ---
 
