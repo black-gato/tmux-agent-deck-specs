@@ -2,7 +2,50 @@
 
 Tracked bugs in tmux-agent-deck. Newest first. Status: `open`, `in-progress`, `fixed`.
 
-Current repo status as of 2026-05-27: BUG-021 fixed. BUG-020 fixed. BUG-019 fixed. BUG-018 fixed. BUG-017 fixed. BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+Current repo status as of 2026-05-28: BUG-022 fixed. BUG-021 fixed. BUG-020 fixed. BUG-019 fixed. BUG-018 fixed. BUG-017 fixed. BUG-016 fixed. BUG-013 is open. BUG-015 was filed but invalid. BUG-014 and BUG-001 through BUG-012 are fixed.
+
+---
+
+## BUG-022: escalation message echoes `@deck-reply … @deck-end` into the conductor pane, parser routes a phantom `...` reply to the worker
+
+**Reported:** 2026-05-28
+**Status:** fixed
+**Severity:** medium (every escalation produced one bogus reply containing literal `...` delivered to the originating worker)
+
+### Summary
+
+The auto-escalation message embedded a literal `Reply with: @deck-reply worker=<id> ... @deck-end` instruction. After delivery, that text sat in the conductor's pane scrollback as a parseable single-line reply block. The next poll cycle's `ParseReplyBlocks` matched the echoed markers, extracted body `...` (the placeholder ellipsis), fingerprinted it as new (distinct from any real reply body), and routed `...` back to the worker via `SendKeys`/`SendRawKeys("Enter")`.
+
+### Observed evidence
+
+A conductor pane containing both the real reply (multi-line, prefixed `⏺`) and the echoed escalation (single-line, prefixed `❯`) — the parser routed both, so the worker received the genuine answer followed by `...`.
+
+### Why existing safeguards missed it
+
+- The feedback-loop guard only rejects bodies containing `@deck-reply`; body here was `...`.
+- First-scan seeding only protects against blocks already in the pane at first sight of the conductor; the escalation arrives later.
+- Fingerprint dedup did not collide because the phantom body (`...`) differed from the real body.
+- `LastIndex("@deck-end")` matched the only end marker on the echoed line.
+
+### Fix
+
+Two changes (defense in depth):
+
+1. `internal/state/escalate.go` — escalation message no longer contains literal `@deck-reply` or `@deck-end` substrings; it references the conductor's role doc instead. Conductors learn the protocol from the managed `CLAUDE.md` block written by `--init-conductor-docs`.
+2. `internal/state/reply.go` — `ParseReplyBlocks` now requires `@deck-reply worker=` at the logical start of a line (after stripping leading whitespace and prompt-prefix glyphs `❯`, `>`, `⏺`). Mid-line occurrences no longer start a block.
+
+Either change alone leaves a gap (template-only is defeated by tmux line-wrap landing the marker at column 0; parser-only is defeated by future code paths that might place markers in the pane). Both together close the class of bug.
+
+### Spec
+
+[docs/superpowers/specs/2026-05-28-reply-marker-isolation-fix.md](superpowers/specs/2026-05-28-reply-marker-isolation-fix.md)
+
+### Affected files
+
+- `internal/state/escalate.go`
+- `internal/state/reply.go`
+- `internal/state/reply_test.go`
+- `internal/state/escalate_test.go`
 
 ---
 
